@@ -82,23 +82,23 @@ end;
 
 function Asn1ToString(str: PASN1_STRING): String;
 var
-  P: PWideChar;
+  B: TBytes;
 begin
   case Str._type of
-   V_ASN1_BMPSTRING: begin
-                        P := GetMemory(Str.length div 2);
-                        UnicodeToUtf8(str.data, p, str.length div 2);
-                        Result := P;
-                        FreeMem(P);
-                     end;
-   V_ASN1_UTF8STRING: begin
-                        Result := Str.data;
-                      end;
-   V_ASN1_T61STRING: begin
-                        Result := Str.data;
-                     end;
+   V_ASN1_BMPSTRING:
+    begin
+      SetLength(B, str.length);
+      Move(str.data^, B[0], str.length);
+      Result := TEncoding.BigEndianUnicode.GetString(B);
+    end;
+   V_ASN1_UTF8STRING:
+    begin
+      SetLength(B, str.length);
+      Move(str.data^, B[0], str.length);
+      Result := TEncoding.UTF8.GetString(B);
+    end;
    else
-     Result := Str.data;
+     Result := string(Str.data);
   end;
 end;
 
@@ -108,15 +108,11 @@ var
   gmask: TC_ULONG;
   mask: TC_ULONG;
   tbl: PASN1_STRING_TABLE;
-  _in: PAnsiChar;
-  _ins: AnsiString;
 begin
-  B := TEncoding.Convert(TEncoding.Default, TEncoding.UTF8, BytesOf(s));
-  _ins := StringOf(B);
+  Result := nil;
 
   gmask := ASN1_STRING_get_default_mask();
   mask := DIRSTRING_TYPE and gmask;
-  Result := nil;
   tbl := ASN1_STRING_TABLE_get(nid);
   SSL_CheckError;
   if tbl <> nil then
@@ -125,9 +121,10 @@ begin
      if (tbl.flags and STABLE_NO_MASK) = 0 then
       mask := mask and gmask;
    end;
-   ASN1_mbstring_copy(@Result, @_ins[1], -1, MBSTRING_UTF8, mask);
-   SSL_CheckError;
 
+   B := TEncoding.UTF8.GetBytes(s);
+   ASN1_mbstring_copy(@Result, PAnsiChar(@B[0]), Length(B), MBSTRING_UTF8, mask);
+   SSL_CheckError;
 end;
 
 function OBJ_ln2sn(ln: PAnsiChar): PAnsiChar;
@@ -148,12 +145,12 @@ begin
 end;
 
 function OBJ_obj2String(a: PASN1_OBJECT; no_name: Integer = 0): String;
-var len: Integer;
-    buf: PAnsiChar;
+var buf: PAnsiChar;
 begin
-  Len := OBJ_obj2txt(buf, 256, a, no_name);
+  buf := nil;
+  OBJ_obj2txt(buf, 256, a, no_name);
   SSL_CheckError;
-  Result := buf;
+  Result := string(buf);
 end;
 
 function DateTimeToUnixTime(ADateTime: TDateTime): TC_time_t;
@@ -167,8 +164,7 @@ begin
 end;
 
 function GeneralizedTimeToDateTime(AGenTime: String): TDateTime;
-var FS: TFormatSettings;
-    y, m, d, h, mm, s: Word;
+var y, m, d, h, mm, s: Word;
 begin
   y := StrToInt(Copy(AGenTime, 1, 4));
   m := StrToInt(Copy(AGenTime, 5, 2));
@@ -176,16 +172,15 @@ begin
   h := StrToInt(Copy(AGenTime, 9, 2));
   mm := StrToInt(Copy(AGenTime, 11, 2));
   s := StrToInt(Copy(AGenTime, 13, 2));
-  Result := EncodeDate(y, m, d)+EncodeTime(h, mm, s, 0);
+  Result := EncodeDate(y, m, d) + EncodeTime(h, mm, s, 0);
 end;
 
 function ASN1ToDateTime(a: PASN1_TIME): TDateTime;
 var gt: PASN1_GENERALIZEDTIME;
 begin
  gt := ASN1_TIME_to_generalizedtime(a, nil);
- Result := GeneralizedTimeToDateTime(gt.data);
+ Result := GeneralizedTimeToDateTime(string(gt.data));
 end;
-
 
 function DateTimeToASN1(ADateTime: TDateTime): PASN1_TIME;
 begin
