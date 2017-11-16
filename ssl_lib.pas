@@ -9,7 +9,7 @@ var
   SSL_C_LIB : AnsiString = 'libeay32.so';
 {$ELSE}
   SSL_C_LIB : AnsiString = 'libeay32.dll';
-{$ENDIF}
+{$IFEND}
 
 
 function SSLCryptHandle: THandle;
@@ -81,6 +81,6 @@ finalization
   dlclose(hCrypt);
  {$ELSE}
   FreeLibrary(hCrypt);
- {$ENDIF}
+ {$IFEND}
 
 end.
